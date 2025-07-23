@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="web-share-target" content="true" />
+    <meta name="theme-color" content="#3b82f6" />
+    <title>Generador de Informes Técnicos</title>
+
+    <!-- Manifest para PWA y mejor soporte de compartir -->
+    <script>
+      // Only load manifest if not running from file:// protocol
+      if (window.location.protocol !== "file:") {
+        const link = document.createElement("link");
+        link.rel = "manifest";
+        link.href = "manifest.json";
+        document.head.appendChild(link);
+      }
+    </script>
+
+    <!-- Bootstrap 5 CSS -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+
+    <!-- Ionicons -->
+    <script
+      type="module"
+      src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.esm.js"
+    ></script>
+    <script
+      nomodule
+      src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.js"
+    ></script>
+
+    <!-- Librerías para generar DOCX -->
+    <script src="https://unpkg.com/docx@7.1.0/build/index.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/1.3.8/FileSaver.js"></script>
+
+    <!-- Librerías para generar PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+    <!-- Dexie para almacenamiento local -->
+    <script src="https://unpkg.com/dexie@3.2.4/dist/dexie.js"></script>
+
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- External CSS -->
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body class="d-flex align-items-center justify-content-center p-0 p-md-4">
+    <div
+      class="app-container d-flex flex-column shadow-lg rounded-0 rounded-md-4 overflow-hidden"
+    >
+      <!-- Toolbar Superior -->
+      <header
+        class="d-flex align-items-center p-3 border-bottom bg-white flex-shrink-0"
+      >
+        <div class="d-flex justify-content-between align-items-center w-100">
+          <button id="header-back-btn" class="btn btn-light bg-white border-0">
+            <ion-icon name="chevron-back-outline" class="fs-5"></ion-icon>
+          </button>
+          <div class="text-center">
+            <h1 id="header-title" class="fs-6 fw-bold text-dark m-0"></h1>
+            <p class="small text-muted m-0">Informe Técnico</p>
+          </div>
+          <button
+            id="header-delete-btn"
+            class="btn btn-light bg-white border-0"
+          >
+            <ion-icon name="trash-outline" class="fs-5 text-danger"></ion-icon>
+          </button>
+        </div>
+      </header>
+
+      <!-- Stepper de Progreso -->
+      <div id="stepper" class="p-4 bg-white border-bottom flex-shrink-0">
+        <!-- El stepper se genera con JS -->
+      </div>
+
+      <!-- Área de Contenido Principal -->
+      <main class="flex-grow-1 overflow-y-auto p-4">
+        <form id="report-form">
+          <!-- Paso 1: Datos de la Empresa -->
+          <div id="step-1" class="step">
+            <h2 class="fs-5 fw-bold text-dark">Información de la Empresa</h2>
+            <p class="small text-muted mt-1 mb-4">
+              Datos de quien emite el informe.
+            </p>
+            <div class="vstack gap-4">
+              <div>
+                <label for="companyName" class="form-label small fw-medium"
+                  >Razón Social</label
+                >
+                <input
+                  type="text"
+                  id="companyName"
+                  class="form-control"
+                  placeholder="Ej: Mi Empresa S.A.S."
+                />
+              </div>
+              <div>
+                <label for="companyNit" class="form-label small fw-medium"
+                  >NIT o Identificación</label
+                >
+                <input
+                  type="text"
+                  id="companyNit"
+                  class="form-control"
+                  placeholder="Ej: 900.123.456-7"
+                />
+              </div>
+              <div>
+                <label for="companyContact" class="form-label small fw-medium"
+                  >Datos de Contacto</label
+                >
+                <input
+                  type="text"
+                  id="companyContact"
+                  class="form-control"
+                  placeholder="Teléfono, Email, Dirección"
+                />
+              </div>
+              <div>
+                <label for="companyCity" class="form-label small fw-medium"
+                  >Ciudad</label
+                >
+                <input
+                  type="text"
+                  id="companyCity"
+                  class="form-control"
+                  placeholder="Ej: Barranquilla"
+                />
+              </div>
+              <div>
+                <label for="authorName" class="form-label small fw-medium"
+                  >Nombre del Autor</label
+                >
+                <input
+                  type="text"
+                  id="authorName"
+                  class="form-control"
+                  placeholder="Ej: Juan Pérez"
+                />
+              </div>
+              <div>
+                <label for="authorRole" class="form-label small fw-medium"
+                  >Cargo del Autor</label
+                >
+                <input
+                  type="text"
+                  id="authorRole"
+                  class="form-control"
+                  placeholder="Ej: Ingeniero de Mantenimiento"
+                />
+              </div>
+              <div>
+                <label for="authorDepartment" class="form-label small fw-medium"
+                  >Departamento del Autor</label
+                >
+                <input
+                  type="text"
+                  id="authorDepartment"
+                  class="form-control"
+                  placeholder="Ej: Departamento Técnico"
+                />
+              </div>
+              <div class="file-upload-container">
+                <label class="form-label small fw-medium">Logo</label>
+                <div id="logo-preview-wrapper"></div>
+                <input
+                  type="file"
+                  id="companyLogo"
+                  class="d-none"
+                  accept="image/*"
+                />
+              </div>
+            </div>
+          </div>
+
+          <!-- Paso 2: Datos del Destinatario -->
+          <div id="step-2" class="step">
+            <h2 class="fs-5 fw-bold text-dark">Información del Destinatario</h2>
+            <p class="small text-muted mt-1 mb-4">
+              ¿Para quién es este informe?
+            </p>
+            <div class="vstack gap-4">
+              <div>
+                <label for="recipientName" class="form-label small fw-medium"
+                  >Nombre del Responsable</label
+                >
+                <input
+                  type="text"
+                  id="recipientName"
+                  class="form-control"
+                  placeholder="Ej: Carlos Cabrera"
+                />
+              </div>
+              <div>
+                <label for="recipientRole" class="form-label small fw-medium"
+                  >Cargo del Responsable</label
+                >
+                <input
+                  type="text"
+                  id="recipientRole"
+                  class="form-control"
+                  placeholder="Ej: Jefe de Mantenimiento"
+                />
+              </div>
+              <div>
+                <label for="reportSubject" class="form-label small fw-medium"
+                  >Asunto del Informe</label
+                >
+                <input
+                  type="text"
+                  id="reportSubject"
+                  class="form-control"
+                  placeholder="Ej: Mantenimiento Preventivo"
+                />
+              </div>
+            </div>
+          </div>
+
+          <!-- Paso 3: Etapas del Informe -->
+          <div id="step-3" class="step">
+            <h2 class="fs-5 fw-bold text-dark">Etapas del Informe</h2>
+            <p class="small text-muted mt-1 mb-4">
+              Añade y describe cada fase del trabajo.
+            </p>
+            <div id="stages-container" class="vstack gap-3"></div>
+            <div class="d-grid">
+              <button
+                type="button"
+                id="add-stage-btn"
+                class="btn btn-outline-primary mt-3"
+              >
+                <ion-icon name="add-circle-outline" class="me-2"></ion-icon
+                >Añadir Nueva Etapa
+              </button>
+            </div>
+
+            <!-- Sección de Recomendaciones -->
+            <div class="mt-4">
+              <h3 class="fs-6 fw-bold text-dark">Recomendaciones</h3>
+              <p class="small text-muted mt-1 mb-3">
+                Añade las recomendaciones finales del informe.
+              </p>
+              <textarea
+                id="recommendations"
+                class="form-control"
+                rows="4"
+                placeholder="Escribe aquí las recomendaciones..."
+              ></textarea>
+            </div>
+          </div>
+
+          <!-- Paso 4: Revisión y Exportación -->
+          <div id="step-4" class="step">
+            <h2 class="fs-5 fw-bold text-dark">Revisa tu Informe</h2>
+            <p class="small text-muted mt-1 mb-4">
+              Verifica que toda la información sea correcta.
+            </p>
+            <div id="review-container" class="vstack gap-3"></div>
+          </div>
+        </form>
+      </main>
+
+      <!-- Barra de Acción Inferior -->
+      <footer class="p-3 bg-white border-top flex-shrink-0">
+        <div class="d-grid">
+          <button
+            type="button"
+            id="main-action-btn"
+            class="btn btn-main-action text-white"
+          >
+            Continuar
+          </button>
+        </div>
+      </footer>
+    </div>
+
+    <!-- Lightbox Modal -->
+    <div id="lightbox" class="lightbox">
+      <span id="lightbox-close" class="lightbox-close">&times;</span>
+      <img id="lightbox-image" class="lightbox-content" src="" />
+    </div>
+
+    <!-- Modal de Confirmación de Eliminación -->
+    <div class="modal fade" id="deleteModal" tabindex="-1">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Eliminar Información</h5>
+            <button
+              type="button"
+              class="btn-close"
+              data-bs-dismiss="modal"
+            ></button>
+          </div>
+          <div class="modal-body">
+            <p>
+              ¿Estás seguro de que deseas eliminar toda la información del
+              formulario actual?
+            </p>
+            <p class="small text-muted">
+              Los datos de empresa y destinatario se guardarán como opciones
+              para futuros informes.
+            </p>
+          </div>
+          <div class="modal-footer">
+            <button
+              type="button"
+              class="btn btn-secondary"
+              data-bs-dismiss="modal"
+            >
+              Cancelar
+            </button>
+            <button type="button" class="btn btn-danger" id="confirmDeleteBtn">
+              Eliminar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal de Selección de Formato -->
+    <div class="modal fade" id="formatModal" tabindex="-1">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Seleccionar Formato</h5>
+            <button
+              type="button"
+              class="btn-close"
+              data-bs-dismiss="modal"
+            ></button>
+          </div>
+          <div class="modal-body">
+            <p class="mb-4">¿En qué formato deseas generar el informe?</p>
+            <div class="d-grid gap-3">
+              <button
+                type="button"
+                class="btn btn-primary btn-lg"
+                id="generateWordBtn"
+              >
+                <div class="d-flex align-items-center justify-content-center">
+                  <ion-icon
+                    name="document-text-outline"
+                    class="fs-4 me-3"
+                  ></ion-icon>
+                  <div class="text-start">
+                    <div class="fw-bold">Documento Word</div>
+                    <small class="text-light">Formato .docx editable</small>
+                  </div>
+                </div>
+              </button>
+              <button
+                type="button"
+                class="btn btn-outline-primary btn-lg"
+                id="generatePdfBtn"
+              >
+                <div class="d-flex align-items-center justify-content-center">
+                  <ion-icon
+                    name="document-outline"
+                    class="fs-4 me-3"
+                  ></ion-icon>
+                  <div class="text-start">
+                    <div class="fw-bold">Documento PDF</div>
+                    <small class="text-muted"
+                      >Formato .pdf para compartir</small
+                    >
+                  </div>
+                </div>
+              </button>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button
+              type="button"
+              class="btn btn-secondary"
+              data-bs-dismiss="modal"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Plantilla para una etapa (oculta) -->
+    <template id="stage-template">
+      <div class="stage-item card">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <input
+              type="text"
+              class="stage-title form-control border-0 fs-6 fw-bold px-1"
+              placeholder="Título de la Etapa"
+            />
+            <button
+              type="button"
+              class="remove-stage-btn btn-close ms-2"
+            ></button>
+          </div>
+          <textarea
+            class="stage-description form-control"
+            rows="3"
+            placeholder="Descripción de actividades..."
+          ></textarea>
+          <div class="mt-3 file-upload-container">
+            <label class="form-label small fw-medium">Fotos</label>
+            <div class="photo-list-container vstack gap-2"></div>
+            <label class="photo-upload-label file-drop-zone mt-2">
+              <ion-icon name="add-circle" class="fs-4 text-primary"></ion-icon>
+              <span class="ms-2 fw-semibold">Añadir fotos</span>
+            </label>
+            <input
+              type="file"
+              class="photo-upload-input d-none"
+              accept="image/*"
+              multiple
+            />
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <!-- Bootstrap 5 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Authentication System -->
+    <script src="js/auth.js"></script>
+
+    <!-- Modular JavaScript -->
+    <script src="js/database.js"></script>
+    <script src="js/fileHandler.js"></script>
+    <script src="js/formManager.js"></script>
+    <script src="js/navigation.js"></script>
+    <script src="js/documentGenerator.js"></script>
+    <script src="js/app.js"></script>
+
+    <!-- Authentication Check -->
+    <script>
+      // Check authentication before initializing app
+      document.addEventListener("DOMContentLoaded", function () {
+        if (!window.authManager || !window.authManager.isAuthenticated()) {
+          window.location.href = "login.html";
+          return;
+        }
+
+        // Update user info in header
+        const currentUser = window.authManager.getCurrentUser();
+        if (currentUser) {
+          // Replace delete button with user menu
+          const headerDeleteBtn = document.getElementById("header-delete-btn");
+          if (headerDeleteBtn) {
+            // Create user menu with dropdown
+            const userMenu = document.createElement("div");
+            userMenu.className = "dropdown";
+            userMenu.innerHTML = `
+              <button class="btn btn-light bg-white border-0" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                <ion-icon name="menu-outline" class="fs-5"></ion-icon>
+              </button>
+              <ul class="dropdown-menu dropdown-menu-end">
+                <li><h6 class="dropdown-header">
+                  <ion-icon name="person-outline" class="me-2"></ion-icon>${
+                    currentUser.fullName
+                  }
+                </h6></li>
+                <li><small class="dropdown-item-text text-muted">Rol: ${
+                  currentUser.role === "admin" ? "Administrador" : "Empleado"
+                }</small></li>
+                <li><hr class="dropdown-divider"></li>
+                <li><button class="dropdown-item" id="clear-data-btn">
+                  <ion-icon name="trash-outline" class="me-2"></ion-icon>Eliminar Información
+                </button></li>
+                <li><hr class="dropdown-divider"></li>
+                <li><button class="dropdown-item" onclick="window.authManager.logout()">
+                  <ion-icon name="log-out-outline" class="me-2"></ion-icon>Cerrar Sesión
+                </button></li>
+              </ul>
+            `;
+
+            // Replace the delete button with the user menu
+            headerDeleteBtn.replaceWith(userMenu);
+
+            // Add event listener for clear data functionality
+            document
+              .getElementById("clear-data-btn")
+              .addEventListener("click", function () {
+                if (
+                  confirm(
+                    "¿Está seguro de que desea eliminar toda la información del formulario? Esta acción no se puede deshacer."
+                  )
+                ) {
+                  // Clear form data
+                  if (window.app && window.app.formManager) {
+                    window.app.formManager.clearFormFields();
+                    window.app.formManager.resetData();
+                  }
+
+                  // Clear database
+                  if (window.app && window.app.database) {
+                    window.app.database.clearCurrentData();
+                  }
+
+                  // Go back to first step
+                  if (window.app && window.app.navigation) {
+                    window.app.navigation.goToStep(1);
+                  }
+
+                  // Show success message
+                  alert("Información eliminada correctamente");
+                }
+              });
+          }
+        }
+      });
+    </script>
+  </body>
+</html>
