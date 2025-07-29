@@ -36,6 +36,44 @@ class DocumentGenerator {
     return null;
   }
 
+  // Helper method to convert base64 to buffer for DOCX
+  base64ToBuffer(base64String) {
+    if (!base64String || typeof base64String !== 'string') {
+      throw new Error('Invalid base64 string: not a string or empty');
+    }
+    
+    try {
+      // Remove data URL prefix if present
+      const base64Data = base64String.includes(',') 
+        ? base64String.split(',')[1] 
+        : base64String;
+      
+      if (!base64Data || base64Data.trim() === '') {
+        throw new Error('Empty base64 data after processing');
+      }
+      
+      // Convert base64 to binary string
+      const binaryString = atob(base64Data);
+      
+      if (binaryString.length === 0) {
+        throw new Error('Empty binary string after base64 decode');
+      }
+      
+      // Convert binary string to Uint8Array
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      
+      console.log(`✅ Successfully converted base64 to buffer, size: ${bytes.length} bytes`);
+      return bytes;
+    } catch (error) {
+      console.error('❌ Error in base64ToBuffer:', error.message);
+      console.error('Base64 string preview:', base64String.substring(0, 100) + '...');
+      throw new Error(`Failed to convert base64 to buffer: ${error.message}`);
+    }
+  }
+
   // Calculate image dimensions using original proportions
   calculateImageDimensions(
     originalWidth,
@@ -213,10 +251,17 @@ class DocumentGenerator {
       let logoHeight = 0;
 
       // Add company logo on the LEFT side of header
+      console.log('🔍 Checking logo for PDF:', {
+        hasLogo: !!reportData.company.logo,
+        logoType: typeof reportData.company.logo,
+        logoKeys: reportData.company.logo ? Object.keys(reportData.company.logo) : 'none'
+      });
+      
       if (reportData.company.logo) {
         try {
           // Get logo data using centralized method
           const logoSrc = this.getLogoData(reportData.company.logo);
+          console.log('🔍 Logo source extracted:', logoSrc ? logoSrc.substring(0, 50) + '...' : 'null');
 
           if (logoSrc) {
             // Calculate maximum allowed logo dimensions
@@ -267,9 +312,23 @@ class DocumentGenerator {
               }
             }
 
-            // Try different image formats for maximum compatibility
+            // Detect image format from data URL and try adding image
             let imageAdded = false;
-            const formats = ["JPEG", "JPG", "PNG", "WEBP", "GIF"];
+            let detectedFormat = "JPEG"; // Default
+            
+            // Detect format from data URL
+            if (logoSrc.includes('data:image/png')) {
+              detectedFormat = "PNG";
+            } else if (logoSrc.includes('data:image/jpeg') || logoSrc.includes('data:image/jpg')) {
+              detectedFormat = "JPEG";
+            } else if (logoSrc.includes('data:image/webp')) {
+              detectedFormat = "WEBP";
+            } else if (logoSrc.includes('data:image/gif')) {
+              detectedFormat = "GIF";
+            }
+            
+            // Try detected format first, then fallback to other formats
+            const formats = [detectedFormat, "JPEG", "PNG", "WEBP", "GIF"].filter((f, i, arr) => arr.indexOf(f) === i);
 
             for (const format of formats) {
               try {
@@ -279,8 +338,10 @@ class DocumentGenerator {
                 logoWidth = logoW;
                 logoHeight = logoH;
                 imageAdded = true;
+                console.log(`✅ Logo added successfully as ${format}`);
                 break;
               } catch (formatError) {
+                console.warn(`❌ Failed to add logo as ${format}:`, formatError.message);
                 continue; // Try next format
               }
             }
@@ -408,9 +469,9 @@ class DocumentGenerator {
       doc.setFont(undefined, "normal");
       yPos += 15;
 
-      // Introduction
+      // Introduction - Usando el texto personalizado del usuario
       yPos = addWrappedText(
-        "Por medio del presente documento, se presenta el informe técnico correspondiente a las actividades realizadas:",
+        reportData.introduction || "Por medio del presente documento, se presenta el informe técnico correspondiente a las actividades realizadas:",
         margin,
         yPos,
         contentWidth
@@ -860,12 +921,12 @@ class DocumentGenerator {
       // Subject
       this.addSubjectBlock(children, reportData, { Paragraph, TextRun });
 
-      // Introduction
+      // Introduction - Usando el texto personalizado del usuario
       children.push(
         new Paragraph({
           children: [
             new TextRun({
-              text: "Por medio del presente documento, se presenta el informe técnico correspondiente a las actividades realizadas:",
+              text: reportData.introduction || "Por medio del presente documento, se presenta el informe técnico correspondiente a las actividades realizadas:",
               size: 24,
             }),
           ],
@@ -954,7 +1015,13 @@ class DocumentGenerator {
 
     // Get logo data and ensure it's valid
     const logoSrc = this.getLogoData(reportData.company.logo);
-    const hasValidLogo = logoSrc && reportData.company.logo;
+    const hasValidLogo = logoSrc && (logoSrc.startsWith('data:image/') || logoSrc.startsWith('data:'));
+    
+    console.log('🔍 Logo validation for Word:', {
+      logoSrc: logoSrc ? logoSrc.substring(0, 50) + '...' : 'null',
+      hasValidLogo,
+      startsWithDataImage: logoSrc ? logoSrc.startsWith('data:image/') : false
+    });
 
     // Calculate optimal logo cell width based on actual logo dimensions
     let logoCellWidth = 5; // Minimal space if no logo
@@ -985,29 +1052,60 @@ class DocumentGenerator {
     }
 
     // Create logo cell content
-    const logoCell = hasValidLogo
-      ? [
+    let logoCell;
+    if (hasValidLogo) {
+      try {
+        console.log('🔍 Processing logo for Word document:', {
+          hasLogo: !!reportData.company.logo,
+          logoType: typeof reportData.company.logo,
+          logoSrc: logoSrc ? logoSrc.substring(0, 50) + '...' : 'null',
+          dimensions: logoDimensions
+        });
+        
+        const logoBuffer = this.base64ToBuffer(logoSrc);
+        console.log('✅ Logo buffer created successfully, size:', logoBuffer.length);
+        
+        logoCell = [
           new Paragraph({
             children: [
               new ImageRun({
-                data: this.fileHandler.base64ToBuffer(logoSrc),
-                transformation: logoDimensions, // Reuse calculated dimensions
+                data: logoBuffer,
+                transformation: logoDimensions,
               }),
             ],
-            alignment: AlignmentType.LEFT, // ENSURE LEFT alignment
+            alignment: AlignmentType.LEFT,
           }),
-        ]
-      : [
+        ];
+        console.log('✅ Logo cell created successfully for Word');
+      } catch (logoError) {
+        console.error('❌ Error processing logo for Word:', logoError);
+        // Fallback to empty cell if logo fails
+        logoCell = [
           new Paragraph({
             children: [
               new TextRun({
-                text: "", // Empty if no logo
+                text: "", // Empty if logo fails
                 size: 12,
               }),
             ],
             alignment: AlignmentType.LEFT,
           }),
         ];
+      }
+    } else {
+      console.log('⚠️ No valid logo found for Word document');
+      logoCell = [
+        new Paragraph({
+          children: [
+            new TextRun({
+              text: "", // Empty if no logo
+              size: 12,
+            }),
+          ],
+          alignment: AlignmentType.LEFT,
+        }),
+      ];
+    }
 
     return new Header({
       children: [
@@ -1288,7 +1386,7 @@ class DocumentGenerator {
                       new Paragraph({
                         children: [
                           new ImageRun({
-                            data: this.fileHandler.base64ToBuffer(
+                            data: this.base64ToBuffer(
                               leftPhoto.data
                             ),
                             transformation: this.calculateImageDimensions(
@@ -1332,7 +1430,7 @@ class DocumentGenerator {
                           new Paragraph({
                             children: [
                               new ImageRun({
-                                data: this.fileHandler.base64ToBuffer(
+                                data: this.base64ToBuffer(
                                   rightPhoto.data
                                 ),
                                 transformation: this.calculateImageDimensions(

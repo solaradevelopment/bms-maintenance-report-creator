@@ -9,6 +9,7 @@ class FormManager {
       recipient: {},
       stages: [],
       recommendations: "",
+      introduction: "Por medio del presente documento, se presenta el informe técnico correspondiente a las actividades realizadas:",
     };
 
     this.stagesContainer = document.getElementById("stages-container");
@@ -66,6 +67,8 @@ class FormManager {
           this.reportData.recipient[id] = value;
         } else if (id === "recommendations") {
           this.reportData.recommendations = value;
+        } else if (id === "introduction") {
+          this.reportData.introduction = value;
         } else if (
           classList.contains("stage-title") ||
           classList.contains("stage-description")
@@ -197,6 +200,11 @@ class FormManager {
       document.getElementById("reportSubject").value =
         savedData.recipient.reportSubject;
 
+    // Populate introduction
+    if (savedData.introduction)
+      document.getElementById("introduction").value =
+        savedData.introduction;
+
     // Populate recommendations
     if (savedData.recommendations)
       document.getElementById("recommendations").value =
@@ -295,7 +303,8 @@ class FormManager {
     document.getElementById("recipientRole").value = "";
     document.getElementById("reportSubject").value = "";
 
-    // Clear recommendations
+    // Clear introduction and recommendations
+    document.getElementById("introduction").value = "";
     document.getElementById("recommendations").value = "";
 
     // Clear stages
@@ -320,6 +329,7 @@ class FormManager {
       recipient: {},
       stages: [],
       recommendations: "",
+      introduction: "Por medio del presente documento, se presenta el informe técnico correspondiente a las actividades realizadas:",
     };
   }
 
