@@ -514,7 +514,15 @@ class DocumentGenerator {
           for (let i = 0; i < stage.photos.length; i++) {
             try {
               const photo = stage.photos[i];
-              const isVertical = (photo.height || 150) > (photo.width || 200);
+              // More robust orientation detection
+              const originalWidth = photo.width || 200;
+              const originalHeight = photo.height || 150;
+              const aspectRatio = originalWidth / originalHeight;
+              
+              // Consider vertical if height is significantly larger than width
+              const isVertical = aspectRatio < 0.8; // Less than 0.8 ratio means clearly vertical
+              
+              console.log(`📸 Photo ${i + 1}: ${originalWidth}x${originalHeight}, ratio: ${aspectRatio.toFixed(2)}, isVertical: ${isVertical}`);
               
               // For vertical photos, use full width. For horizontal, try side-by-side
               if (isVertical) {
@@ -553,7 +561,12 @@ class DocumentGenerator {
               } else {
                 // Horizontal photos - try to fit two side by side
                 const nextPhoto = stage.photos[i + 1];
-                const nextIsHorizontal = nextPhoto ? (nextPhoto.width || 200) >= (nextPhoto.height || 150) : false;
+                let nextIsHorizontal = false;
+                if (nextPhoto) {
+                  const nextAspectRatio = (nextPhoto.width || 200) / (nextPhoto.height || 150);
+                  nextIsHorizontal = nextAspectRatio >= 0.8; // 0.8 or higher ratio means horizontal
+                  console.log(`📸 Next photo: ${nextPhoto.width || 200}x${nextPhoto.height || 150}, ratio: ${nextAspectRatio.toFixed(2)}, isHorizontal: ${nextIsHorizontal}`);
+                }
                 
                 if (nextPhoto && nextIsHorizontal) {
                   // Two horizontal photos side by side
@@ -1423,7 +1436,15 @@ class DocumentGenerator {
         for (let i = 0; i < stage.photos.length; i++) {
           try {
             const photo = stage.photos[i];
-            const isVertical = (photo.height || 150) > (photo.width || 200);
+            // More robust orientation detection for Word
+            const originalWidth = photo.width || 200;
+            const originalHeight = photo.height || 150;
+            const aspectRatio = originalWidth / originalHeight;
+            
+            // Consider vertical if height is significantly larger than width
+            const isVertical = aspectRatio < 0.8; // Less than 0.8 ratio means clearly vertical
+            
+            console.log(`📝 Word Photo ${i + 1}: ${originalWidth}x${originalHeight}, ratio: ${aspectRatio.toFixed(2)}, isVertical: ${isVertical}`);
             
             if (isVertical) {
               // Single vertical photo - full width table
@@ -1468,7 +1489,12 @@ class DocumentGenerator {
             } else {
               // Horizontal photos - try to fit two side by side
               const nextPhoto = stage.photos[i + 1];
-              const nextIsHorizontal = nextPhoto ? (nextPhoto.width || 200) >= (nextPhoto.height || 150) : false;
+              let nextIsHorizontal = false;
+              if (nextPhoto) {
+                const nextAspectRatio = (nextPhoto.width || 200) / (nextPhoto.height || 150);
+                nextIsHorizontal = nextAspectRatio >= 0.8; // 0.8 or higher ratio means horizontal
+                console.log(`📝 Word Next photo: ${nextPhoto.width || 200}x${nextPhoto.height || 150}, ratio: ${nextAspectRatio.toFixed(2)}, isHorizontal: ${nextIsHorizontal}`);
+              }
               
               if (nextPhoto && nextIsHorizontal) {
                 // Two horizontal photos side by side
