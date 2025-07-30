@@ -262,8 +262,14 @@ class DocumentGenerator {
           // Get logo data using centralized method
           const logoSrc = this.getLogoData(reportData.company.logo);
           console.log('🔍 Logo source extracted:', logoSrc ? logoSrc.substring(0, 50) + '...' : 'null');
+          
+          // Validate logo source
+          if (!logoSrc || !logoSrc.startsWith('data:image/')) {
+            console.warn('⚠️ Invalid logo source format, skipping logo');
+            logoWidth = 0;
+            logoHeight = 0;
+          } else {
 
-          if (logoSrc) {
             // Calculate maximum allowed logo dimensions
             const pageWidthA4 = 210; // mm
             const marginSize = 20; // mm each side

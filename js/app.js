@@ -30,10 +30,15 @@ class ReportGeneratorApp {
 
       // Initialize components
       this.navigation.initializeStepper();
-      this.formManager.initializeLogoHandler();
-
-      // Load saved data and populate form
+      
+      // Load saved data and populate form first
       await this.loadSavedData();
+
+      // Initialize logo handler after data is loaded
+      setTimeout(() => {
+        console.log('🔧 Initializing logo handler after data load');
+        this.formManager.initializeLogoHandler();
+      }, 200);
 
       // Initialize dropdowns with saved options
       await this.formManager.initializeOptionsDropdowns();

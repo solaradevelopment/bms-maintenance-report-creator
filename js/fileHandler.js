@@ -90,7 +90,17 @@ class FileHandler {
     const logoInput = document.getElementById("companyLogo");
     const logoPreviewWrapper = document.getElementById("logo-preview-wrapper");
 
+    console.log('🔧 Initializing logo handler:', {
+      logoInput: !!logoInput,
+      logoPreviewWrapper: !!logoPreviewWrapper,
+      currentLogo: !!reportData?.company?.logo
+    });
+
     if (!logoInput || !logoPreviewWrapper) {
+      console.error('❌ Logo elements not found:', {
+        logoInput: !!logoInput,
+        logoPreviewWrapper: !!logoPreviewWrapper
+      });
       return null;
     }
 
@@ -99,18 +109,25 @@ class FileHandler {
       logoInput.removeEventListener("change", logoInput._logoChangeHandler);
     }
 
-    this.createFileDropZone(logoPreviewWrapper, logoInput);
+    // Only create drop zone if no logo exists
+    if (!reportData?.company?.logo) {
+      this.createFileDropZone(logoPreviewWrapper, logoInput);
+    }
 
     // Create the event handler function and store reference for later removal
     const logoChangeHandler = async (e) => {
+      console.log('📁 Logo file selected:', e.target.files[0]?.name);
       const file = e.target.files[0];
       if (file) {
+        console.log('📖 Reading logo file...');
         const reader = new FileReader();
         reader.onload = async (event) => {
           try {
+            console.log('🖼️ Logo file read, creating image...');
             // Create image to get original dimensions
             const img = new Image();
             img.onload = async () => {
+              console.log('✅ Logo image loaded, dimensions:', img.naturalWidth, 'x', img.naturalHeight);
               // Store logo data with dimensions (same format as stage photos)
               const logoId = `logo-${Date.now()}`;
               reportData.company.logo = {
@@ -120,6 +137,14 @@ class FileHandler {
                 width: img.naturalWidth,
                 height: img.naturalHeight,
               };
+              
+              console.log('💾 Logo data stored:', {
+                id: logoId,
+                name: file.name,
+                dataLength: event.target.result.length,
+                width: img.naturalWidth,
+                height: img.naturalHeight
+              });
 
               this.createFilePreview(
                 file,
@@ -217,11 +242,27 @@ class FileHandler {
 
   // Restore logo preview from saved data
   restoreLogoPreview(logoData) {
+    console.log('🔄 Attempting to restore logo preview:', {
+      hasLogoData: !!logoData,
+      logoType: typeof logoData,
+      logoData: logoData
+    });
+    
     if (logoData) {
       const logoPreviewWrapper = document.getElementById(
         "logo-preview-wrapper"
       );
       const logoInput = document.getElementById("companyLogo");
+
+      console.log('🔍 Logo elements found:', {
+        logoPreviewWrapper: !!logoPreviewWrapper,
+        logoInput: !!logoInput
+      });
+
+      if (!logoPreviewWrapper || !logoInput) {
+        console.error('❌ Cannot restore logo - missing elements');
+        return;
+      }
 
       // Handle different formats: string (old), object with 'src' (old), object with 'data' (new)
       const logoSrc =
@@ -231,33 +272,46 @@ class FileHandler {
           ? "Logo guardado"
           : logoData.name || "Logo guardado";
 
-      this.createFilePreview(
-        { name: logoName },
-        logoSrc,
-        logoPreviewWrapper,
-        () => {
-          // Handle logo removal
-          const reportData = window.app?.formManager?.getReportData();
-          if (reportData) {
-            reportData.company.logo = null;
-            logoInput.value = "";
-            this.createFileDropZone(logoPreviewWrapper, logoInput);
+      console.log('🔍 Logo source extracted:', {
+        logoSrc: logoSrc ? logoSrc.substring(0, 50) + '...' : 'null',
+        logoName
+      });
 
-            // Reinitialize logo handler to restore event listeners
-            window.app?.formManager?.initializeLogoHandler();
+      if (logoSrc) {
+        console.log('✅ Creating logo preview with valid source');
+        this.createFilePreview(
+          { name: logoName },
+          logoSrc,
+          logoPreviewWrapper,
+          () => {
+            console.log('🗑️ Logo removal triggered');
+            // Handle logo removal
+            const reportData = window.app?.formManager?.getReportData();
+            if (reportData) {
+              reportData.company.logo = null;
+              logoInput.value = "";
+              this.createFileDropZone(logoPreviewWrapper, logoInput);
 
-            // Save changes - call method with proper context
-            const database = window.app?.database;
-            if (database && database.saveCurrentData) {
-              try {
-                database.saveCurrentData(reportData);
-              } catch (saveError) {
-                console.warn("Error saving logo removal:", saveError);
+              // Reinitialize logo handler to restore event listeners
+              window.app?.formManager?.initializeLogoHandler();
+
+              // Save changes - call method with proper context
+              const database = window.app?.database;
+              if (database && database.saveCurrentData) {
+                try {
+                  database.saveCurrentData(reportData);
+                } catch (saveError) {
+                  console.warn("Error saving logo removal:", saveError);
+                }
               }
             }
           }
-        }
-      );
+        );
+      } else {
+        console.error('❌ Cannot create logo preview - no valid source');
+      }
+    } else {
+      console.log('ℹ️ No logo data to restore');
     }
   }
 

@@ -220,7 +220,10 @@ class FormManager {
         "✅ Calling restoreLogoPreview with:",
         savedData.company.logo
       );
-      this.fileHandler.restoreLogoPreview(savedData.company.logo);
+      // Use setTimeout to ensure DOM is ready
+      setTimeout(() => {
+        this.fileHandler.restoreLogoPreview(savedData.company.logo);
+      }, 100);
     } else {
       console.log(
         "❌ Cannot restore logo - fileHandler:",
@@ -228,6 +231,12 @@ class FormManager {
         "logo:",
         !!savedData.company.logo
       );
+      // Initialize logo handler even if no saved logo
+      if (this.fileHandler) {
+        setTimeout(() => {
+          this.initializeLogoHandler();
+        }, 100);
+      }
     }
 
     // Populate stages
