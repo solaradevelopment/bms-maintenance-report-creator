@@ -74,45 +74,36 @@ class DocumentGenerator {
     }
   }
 
-  // Calculate image dimensions preserving original orientation
+  // Calculate image dimensions using original proportions
   calculateImageDimensions(
     originalWidth,
     originalHeight,
     maxWidth = 400,
-    maxHeight = 250,
-    forceOrientation = null
+    maxHeight = 250
   ) {
     if (!originalWidth || !originalHeight) {
+      // Fallback dimensions if no original size provided
       return { width: 240, height: 135 };
     }
 
-    // CRITICAL: Always preserve the original aspect ratio exactly
-    const aspectRatio = originalWidth / originalHeight;
-    
-    // If forcing orientation, swap dimensions if needed
-    let workingWidth = originalWidth;
-    let workingHeight = originalHeight;
-    
-    if (forceOrientation === 'vertical' && aspectRatio > 1) {
-      // Force vertical: swap if currently horizontal
-      workingWidth = originalHeight;
-      workingHeight = originalWidth;
-    } else if (forceOrientation === 'horizontal' && aspectRatio < 1) {
-      // Force horizontal: swap if currently vertical
-      workingWidth = originalHeight;
-      workingHeight = originalWidth;
+    // Use original proportions, but scale down if too large
+    let finalWidth = originalWidth;
+    let finalHeight = originalHeight;
+
+    // Scale down if image is too wide
+    if (finalWidth > maxWidth) {
+      const ratio = maxWidth / finalWidth;
+      finalWidth = maxWidth;
+      finalHeight = Math.round(finalHeight * ratio);
     }
-    
-    // Scale to fit within constraints while preserving aspect ratio
-    const widthRatio = maxWidth / workingWidth;
-    const heightRatio = maxHeight / workingHeight;
-    const scaleFactor = Math.min(widthRatio, heightRatio, 1); // Never scale up
-    
-    const finalWidth = Math.round(workingWidth * scaleFactor);
-    const finalHeight = Math.round(workingHeight * scaleFactor);
-    
-    console.log(`🔧 Image calc: ${originalWidth}x${originalHeight} → ${finalWidth}x${finalHeight} (scale: ${scaleFactor.toFixed(2)})`);
-    
+
+    // Scale down if image is too tall after width scaling
+    if (finalHeight > maxHeight) {
+      const ratio = maxHeight / finalHeight;
+      finalHeight = maxHeight;
+      finalWidth = Math.round(finalWidth * ratio);
+    }
+
     return {
       width: finalWidth,
       height: finalHeight,
@@ -535,13 +526,12 @@ class DocumentGenerator {
               
               // For vertical photos, use full width. For horizontal, try side-by-side
               if (isVertical) {
-                // Single vertical photo - FORCE vertical orientation
+                // Single vertical photo takes full width
                 const photoDimensions = this.calculateImageDimensions(
                   photo.width || 200,
                   photo.height || 150,
                   contentWidth * 0.6, // 60% of page width for vertical photos
-                  (300 * 25.4) / 96, // Taller max height for vertical photos
-                  'vertical' // FORCE vertical orientation
+                  (300 * 25.4) / 96 // Taller max height for vertical photos
                 );
                 
                 // Check if we need a new page
@@ -640,13 +630,12 @@ class DocumentGenerator {
                   yPos += maxImageHeight + 15;
                   i++; // Skip next photo since we processed it
                 } else {
-                  // Single horizontal photo - FORCE horizontal orientation
+                  // Single horizontal photo
                   const photoDimensions = this.calculateImageDimensions(
                     photo.width || 200,
                     photo.height || 150,
                     contentWidth * 0.8, // 80% width for single horizontal
-                    (200 * 25.4) / 96,
-                    'horizontal' // FORCE horizontal orientation
+                    (200 * 25.4) / 96
                   );
                   
                   // Check if we need a new page
@@ -1458,13 +1447,12 @@ class DocumentGenerator {
             console.log(`📝 Word Photo ${i + 1}: ${originalWidth}x${originalHeight}, ratio: ${aspectRatio.toFixed(2)}, isVertical: ${isVertical}`);
             
             if (isVertical) {
-              // Single vertical photo - FORCE vertical orientation
+              // Single vertical photo - full width table
               const photoDimensions = this.calculateImageDimensions(
                 photo.width || 200,
                 photo.height || 150,
                 400, // Max width for vertical
-                350, // Taller max height for vertical
-                'vertical' // FORCE vertical orientation
+                350  // Taller max height for vertical
               );
               
               children.push(
@@ -1577,13 +1565,12 @@ class DocumentGenerator {
                 );
                 i++; // Skip next photo since we processed it
               } else {
-                // Single horizontal photo - FORCE horizontal orientation
+                // Single horizontal photo
                 const photoDimensions = this.calculateImageDimensions(
                   photo.width || 200,
                   photo.height || 150,
                   500, // Wider max width for single horizontal
-                  200, // Max height for horizontal
-                  'horizontal' // FORCE horizontal orientation
+                  200  // Max height for horizontal
                 );
                 
                 children.push(
