@@ -6,10 +6,11 @@ Sistema web para la generación automatizada de informes técnicos con autentica
 
 ### Usuarios del Sistema
 
-| Usuario       | Contraseña  | Rol           | Permisos        |
-| ------------- | ----------- | ------------- | --------------- |
-| `willy_admin` | `admin2024` | Administrador | Acceso completo |
-| `usuario1`    | `emp123`    | Empleado      | Crear informes  |
+| Usuario         | Contraseña  | Rol           | Permisos        |
+| --------------- | ----------- | ------------- | --------------- |
+| `willy_admin`   | `admin2024` | Administrador | Acceso completo |
+| `inspectorasst` | `emp123`    | Empleado      | Crear informes  |
+| `tecnicolider`  | `tech123`   | Empleado      | Crear informes  |
 
 ## 🚀 Características Principales
 

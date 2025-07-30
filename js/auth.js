@@ -16,10 +16,17 @@ class AuthManager {
         ],
       },
       {
-        username: "usuario1",
+        username: "inspectorasst",
         password: "emp123",
         role: "employee",
-        fullName: "Usuario Empleado",
+        fullName: "Inspector Asistente",
+        permissions: ["create_reports", "view_reports"],
+      },
+      {
+        username: "tecnicolider",
+        password: "tech123",
+        role: "employee",
+        fullName: "Técnico Líder",
         permissions: ["create_reports", "view_reports"],
       },
     ];
