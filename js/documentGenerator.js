@@ -36,17 +36,41 @@ class DocumentGenerator {
     return null;
   }
 
-  // Detect photo orientation - simplified and more reliable
+  // Detect photo orientation considering EXIF data from mobile devices
   detectPhotoOrientation(photo) {
     if (!photo) return false;
     
     const width = photo.width || 200;
     const height = photo.height || 150;
     
-    // Simple but effective: if height > width, it's vertical
-    const isVertical = height > width;
+    // Check if photo has EXIF orientation data (common in mobile photos)
+    const hasExifRotation = photo.exifOrientation || 
+                           (photo.data && photo.data.includes('Exif')) ||
+                           (photo.name && /\.(jpe?g|JPE?G)$/i.test(photo.name));
     
-    console.log(`📸 Photo: ${width}x${height} → ${isVertical ? 'VERTICAL' : 'HORIZONTAL'}`);
+    console.log(`🔍 Photo analysis: ${width}x${height}, hasExif: ${hasExifRotation}, name: ${photo.name || 'unknown'}`);
+    
+    // For mobile photos, use a more aggressive vertical detection
+    // Mobile cameras often report swapped dimensions due to EXIF rotation
+    if (hasExifRotation) {
+      // If it's a mobile photo, check both possible orientations
+      const normalRatio = width / height;
+      const swappedRatio = height / width;
+      
+      // Consider vertical if either orientation suggests it's vertical
+      const isVerticalNormal = normalRatio < 0.9; // Less than 0.9 ratio
+      const isVerticalSwapped = swappedRatio < 0.9;
+      
+      // If dimensions suggest it could be vertical in either orientation, assume vertical
+      const result = isVerticalNormal || isVerticalSwapped;
+      console.log(`📱 Mobile photo detected: normal=${normalRatio.toFixed(2)} (${isVerticalNormal ? 'V' : 'H'}), swapped=${swappedRatio.toFixed(2)} (${isVerticalSwapped ? 'V' : 'H'}) → ${result ? 'VERTICAL' : 'HORIZONTAL'}`);
+      return result;
+    }
+    
+    // For regular photos, use standard detection
+    const aspectRatio = width / height;
+    const isVertical = aspectRatio < 0.8;
+    console.log(`📷 Regular photo: ${aspectRatio.toFixed(2)} → ${isVertical ? 'VERTICAL' : 'HORIZONTAL'}`);
     return isVertical;
   }
   
@@ -529,19 +553,19 @@ class DocumentGenerator {
               console.log(`📸 Processing photos ${i + 1}${rightPhoto ? ` and ${i + 2}` : ''}: left=${leftIsVertical ? 'V' : 'H'}${rightPhoto ? `, right=${rightIsVertical ? 'V' : 'H'}` : ''}`);
               
               if (leftIsVertical && rightPhoto && rightIsVertical) {
-                // Two vertical photos - LARGER side by side
+                // Two vertical photos - put them side by side with smaller width
                 const leftDimensions = this.calculateImageDimensions(
                   leftPhoto.width || 200,
                   leftPhoto.height || 150,
                   contentWidth / 2 - 5, // Half width for side by side
-                  (350 * 25.4) / 96 // Much taller for vertical
+                  (280 * 25.4) / 96 // Taller for vertical
                 );
                 
                 const rightDimensions = this.calculateImageDimensions(
                   rightPhoto.width || 200,
                   rightPhoto.height || 150,
                   contentWidth / 2 - 5, // Half width for side by side
-                  (350 * 25.4) / 96 // Much taller for vertical
+                  (280 * 25.4) / 96 // Taller for vertical
                 );
                 
                 const maxImageHeight = Math.max(leftDimensions.height, rightDimensions.height);
@@ -589,12 +613,12 @@ class DocumentGenerator {
                 
                 yPos += maxImageHeight + 15;
               } else if (leftIsVertical) {
-                // Single vertical photo - MUCH LARGER
+                // Single vertical photo - full width
                 const photoDimensions = this.calculateImageDimensions(
                   leftPhoto.width || 200,
                   leftPhoto.height || 150,
-                  contentWidth * 0.8, // 80% of page width for vertical
-                  (400 * 25.4) / 96 // Much taller max height for vertical
+                  contentWidth * 0.5, // 50% of page width for vertical
+                  (300 * 25.4) / 96 // Taller max height for vertical
                 );
                 
                 // Check if we need a new page
@@ -1496,12 +1520,12 @@ class DocumentGenerator {
             console.log(`📝 Word photos ${i + 1}${rightPhoto ? ` and ${i + 2}` : ''}: left=${leftIsVertical ? 'V' : 'H'}${rightPhoto ? `, right=${rightIsVertical ? 'V' : 'H'}` : ''}`);
             
             if (leftIsVertical && !rightPhoto) {
-              // Single vertical photo - MUCH LARGER
+              // Single vertical photo
               const photoDimensions = this.calculateImageDimensions(
                 leftPhoto.width || 200,
                 leftPhoto.height || 150,
-                400, // Much wider max width for single vertical
-                500  // Much taller max height for vertical
+                300, // Max width for single vertical
+                400  // Taller max height for vertical
               );
               
               children.push(
@@ -1540,15 +1564,15 @@ class DocumentGenerator {
               const leftDimensions = this.calculateImageDimensions(
                 leftPhoto.width || 200,
                 leftPhoto.height || 150,
-                350, // Wider max width for side-by-side
-                leftIsVertical ? 450 : 250  // Much taller if vertical
+                300, // Max width for side-by-side
+                leftIsVertical ? 350 : 200  // Taller if vertical
               );
               
               const rightDimensions = this.calculateImageDimensions(
                 rightPhoto.width || 200,
                 rightPhoto.height || 150,
-                350, // Wider max width for side-by-side
-                rightIsVertical ? 450 : 250  // Much taller if vertical
+                300, // Max width for side-by-side
+                rightIsVertical ? 350 : 200  // Taller if vertical
               );
               
               children.push(
