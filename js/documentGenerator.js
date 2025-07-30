@@ -36,44 +36,6 @@ class DocumentGenerator {
     return null;
   }
 
-  // Detect photo orientation considering EXIF data from mobile devices
-  detectPhotoOrientation(photo) {
-    if (!photo) return false;
-    
-    const width = photo.width || 200;
-    const height = photo.height || 150;
-    
-    // Check if photo has EXIF orientation data (common in mobile photos)
-    const hasExifRotation = photo.exifOrientation || 
-                           (photo.data && photo.data.includes('Exif')) ||
-                           (photo.name && /\.(jpe?g|JPE?G)$/i.test(photo.name));
-    
-    console.log(`🔍 Photo analysis: ${width}x${height}, hasExif: ${hasExifRotation}, name: ${photo.name || 'unknown'}`);
-    
-    // For mobile photos, use a more aggressive vertical detection
-    // Mobile cameras often report swapped dimensions due to EXIF rotation
-    if (hasExifRotation) {
-      // If it's a mobile photo, check both possible orientations
-      const normalRatio = width / height;
-      const swappedRatio = height / width;
-      
-      // Consider vertical if either orientation suggests it's vertical
-      const isVerticalNormal = normalRatio < 0.9; // Less than 0.9 ratio
-      const isVerticalSwapped = swappedRatio < 0.9;
-      
-      // If dimensions suggest it could be vertical in either orientation, assume vertical
-      const result = isVerticalNormal || isVerticalSwapped;
-      console.log(`📱 Mobile photo detected: normal=${normalRatio.toFixed(2)} (${isVerticalNormal ? 'V' : 'H'}), swapped=${swappedRatio.toFixed(2)} (${isVerticalSwapped ? 'V' : 'H'}) → ${result ? 'VERTICAL' : 'HORIZONTAL'}`);
-      return result;
-    }
-    
-    // For regular photos, use standard detection
-    const aspectRatio = width / height;
-    const isVertical = aspectRatio < 0.8;
-    console.log(`📷 Regular photo: ${aspectRatio.toFixed(2)} → ${isVertical ? 'VERTICAL' : 'HORIZONTAL'}`);
-    return isVertical;
-  }
-  
   // Helper method to convert base64 to buffer for DOCX
   base64ToBuffer(base64String) {
     if (!base64String || typeof base64String !== 'string') {
@@ -546,9 +508,9 @@ class DocumentGenerator {
               const leftPhoto = stage.photos[i];
               const rightPhoto = stage.photos[i + 1];
               
-              // Check orientations with EXIF correction for mobile photos
-              const leftIsVertical = this.detectPhotoOrientation(leftPhoto);
-              const rightIsVertical = rightPhoto ? this.detectPhotoOrientation(rightPhoto) : false;
+              // Check orientations
+              const leftIsVertical = leftPhoto ? (leftPhoto.height || 150) > (leftPhoto.width || 200) : false;
+              const rightIsVertical = rightPhoto ? (rightPhoto.height || 150) > (rightPhoto.width || 200) : false;
               
               console.log(`📸 Processing photos ${i + 1}${rightPhoto ? ` and ${i + 2}` : ''}: left=${leftIsVertical ? 'V' : 'H'}${rightPhoto ? `, right=${rightIsVertical ? 'V' : 'H'}` : ''}`);
               
@@ -1513,9 +1475,9 @@ class DocumentGenerator {
             const leftPhoto = stage.photos[i];
             const rightPhoto = stage.photos[i + 1];
             
-            // Check orientations with EXIF correction for mobile photos
-            const leftIsVertical = this.detectPhotoOrientation(leftPhoto);
-            const rightIsVertical = rightPhoto ? this.detectPhotoOrientation(rightPhoto) : false;
+            // Check orientations
+            const leftIsVertical = leftPhoto ? (leftPhoto.height || 150) > (leftPhoto.width || 200) : false;
+            const rightIsVertical = rightPhoto ? (rightPhoto.height || 150) > (rightPhoto.width || 200) : false;
             
             console.log(`📝 Word photos ${i + 1}${rightPhoto ? ` and ${i + 2}` : ''}: left=${leftIsVertical ? 'V' : 'H'}${rightPhoto ? `, right=${rightIsVertical ? 'V' : 'H'}` : ''}`);
             
