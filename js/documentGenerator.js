@@ -74,27 +74,44 @@ class DocumentGenerator {
     }
   }
 
-  // Calculate image dimensions preserving original aspect ratio
+  // Calculate image dimensions preserving original orientation
   calculateImageDimensions(
     originalWidth,
     originalHeight,
     maxWidth = 400,
-    maxHeight = 250
+    maxHeight = 250,
+    forceOrientation = null
   ) {
     if (!originalWidth || !originalHeight) {
       return { width: 240, height: 135 };
     }
 
-    // Always preserve the original aspect ratio exactly
+    // CRITICAL: Always preserve the original aspect ratio exactly
     const aspectRatio = originalWidth / originalHeight;
     
+    // If forcing orientation, swap dimensions if needed
+    let workingWidth = originalWidth;
+    let workingHeight = originalHeight;
+    
+    if (forceOrientation === 'vertical' && aspectRatio > 1) {
+      // Force vertical: swap if currently horizontal
+      workingWidth = originalHeight;
+      workingHeight = originalWidth;
+    } else if (forceOrientation === 'horizontal' && aspectRatio < 1) {
+      // Force horizontal: swap if currently vertical
+      workingWidth = originalHeight;
+      workingHeight = originalWidth;
+    }
+    
     // Scale to fit within constraints while preserving aspect ratio
-    const widthRatio = maxWidth / originalWidth;
-    const heightRatio = maxHeight / originalHeight;
+    const widthRatio = maxWidth / workingWidth;
+    const heightRatio = maxHeight / workingHeight;
     const scaleFactor = Math.min(widthRatio, heightRatio, 1); // Never scale up
     
-    const finalWidth = Math.round(originalWidth * scaleFactor);
-    const finalHeight = Math.round(originalHeight * scaleFactor);
+    const finalWidth = Math.round(workingWidth * scaleFactor);
+    const finalHeight = Math.round(workingHeight * scaleFactor);
+    
+    console.log(`🔧 Image calc: ${originalWidth}x${originalHeight} → ${finalWidth}x${finalHeight} (scale: ${scaleFactor.toFixed(2)})`);
     
     return {
       width: finalWidth,
@@ -501,86 +518,30 @@ class DocumentGenerator {
           yPos += 5;
         }
 
-        // Add photos with improved layout
+        // Add photos with smart orientation handling
         if (stage.photos && stage.photos.length > 0) {
-          for (let i = 0; i < stage.photos.length; i += 2) {
+          for (let i = 0; i < stage.photos.length; i++) {
             try {
-              const leftPhoto = stage.photos[i];
-              const rightPhoto = stage.photos[i + 1];
+              const photo = stage.photos[i];
+              // More robust orientation detection
+              const originalWidth = photo.width || 200;
+              const originalHeight = photo.height || 150;
+              const aspectRatio = originalWidth / originalHeight;
               
-              // Check orientations
-              const leftIsVertical = leftPhoto ? (leftPhoto.height || 150) > (leftPhoto.width || 200) : false;
-              const rightIsVertical = rightPhoto ? (rightPhoto.height || 150) > (rightPhoto.width || 200) : false;
+              // Consider vertical if height is significantly larger than width
+              const isVertical = aspectRatio < 0.8; // Less than 0.8 ratio means clearly vertical
               
-              console.log(`📸 Processing photos ${i + 1}${rightPhoto ? ` and ${i + 2}` : ''}: left=${leftIsVertical ? 'V' : 'H'}${rightPhoto ? `, right=${rightIsVertical ? 'V' : 'H'}` : ''}`);
+              console.log(`📸 Photo ${i + 1}: ${originalWidth}x${originalHeight}, ratio: ${aspectRatio.toFixed(2)}, isVertical: ${isVertical}`);
               
-              if (leftIsVertical && rightPhoto && rightIsVertical) {
-                // Two vertical photos - put them side by side with smaller width
-                const leftDimensions = this.calculateImageDimensions(
-                  leftPhoto.width || 200,
-                  leftPhoto.height || 150,
-                  contentWidth / 2 - 5, // Half width for side by side
-                  (280 * 25.4) / 96 // Taller for vertical
-                );
-                
-                const rightDimensions = this.calculateImageDimensions(
-                  rightPhoto.width || 200,
-                  rightPhoto.height || 150,
-                  contentWidth / 2 - 5, // Half width for side by side
-                  (280 * 25.4) / 96 // Taller for vertical
-                );
-                
-                const maxImageHeight = Math.max(leftDimensions.height, rightDimensions.height);
-                
-                // Check if we need a new page
-                if (yPos + maxImageHeight > 280) {
-                  doc.addPage();
-                  yPos = 20;
-                }
-                
-                // Add border for two photos
-                doc.setDrawColor(200, 200, 200);
-                doc.setLineWidth(0.5);
-                const tableY = yPos - 5;
-                const tableHeight = maxImageHeight + 10;
-                const leftCellWidth = contentWidth / 2;
-                
-                doc.rect(margin - 2, tableY, contentWidth + 4, tableHeight);
-                doc.line(
-                  margin + leftCellWidth + 1.5,
-                  tableY,
-                  margin + leftCellWidth + 1.5,
-                  tableY + tableHeight
-                );
-                
-                // Add left vertical photo
-                doc.addImage(
-                  leftPhoto.data,
-                  "JPEG",
-                  margin + (leftCellWidth - leftDimensions.width) / 2,
-                  yPos,
-                  leftDimensions.width,
-                  leftDimensions.height
-                );
-                
-                // Add right vertical photo
-                doc.addImage(
-                  rightPhoto.data,
-                  "JPEG",
-                  margin + leftCellWidth + 5 + (leftCellWidth - rightDimensions.width) / 2,
-                  yPos,
-                  rightDimensions.width,
-                  rightDimensions.height
-                );
-                
-                yPos += maxImageHeight + 15;
-              } else if (leftIsVertical) {
-                // Single vertical photo - full width
+              // For vertical photos, use full width. For horizontal, try side-by-side
+              if (isVertical) {
+                // Single vertical photo - FORCE vertical orientation
                 const photoDimensions = this.calculateImageDimensions(
-                  leftPhoto.width || 200,
-                  leftPhoto.height || 150,
-                  contentWidth * 0.5, // 50% of page width for vertical
-                  (300 * 25.4) / 96 // Taller max height for vertical
+                  photo.width || 200,
+                  photo.height || 150,
+                  contentWidth * 0.6, // 60% of page width for vertical photos
+                  (300 * 25.4) / 96, // Taller max height for vertical photos
+                  'vertical' // FORCE vertical orientation
                 );
                 
                 // Check if we need a new page
@@ -598,7 +559,7 @@ class DocumentGenerator {
                 
                 // Center the vertical photo
                 doc.addImage(
-                  leftPhoto.data,
+                  photo.data,
                   "JPEG",
                   margin + (contentWidth - photoDimensions.width) / 2,
                   yPos,
@@ -607,102 +568,115 @@ class DocumentGenerator {
                 );
                 
                 yPos += photoDimensions.height + 15;
-                i--; // Process next photo in next iteration
-              } else if (rightPhoto && !rightIsVertical) {
-                // Two horizontal photos side by side
-                const leftDimensions = this.calculateImageDimensions(
-                  leftPhoto.width || 200,
-                  leftPhoto.height || 150,
-                  contentWidth / 2 - 5,
-                  (200 * 25.4) / 96
-                );
-                
-                const rightDimensions = this.calculateImageDimensions(
-                  rightPhoto.width || 200,
-                  rightPhoto.height || 150,
-                  contentWidth / 2 - 5,
-                  (200 * 25.4) / 96
-                );
-                
-                const maxImageHeight = Math.max(leftDimensions.height, rightDimensions.height);
-                
-                // Check if we need a new page
-                if (yPos + maxImageHeight > 280) {
-                  doc.addPage();
-                  yPos = 20;
-                }
-                
-                // Add border for two photos
-                doc.setDrawColor(200, 200, 200);
-                doc.setLineWidth(0.5);
-                const tableY = yPos - 5;
-                const tableHeight = maxImageHeight + 10;
-                const leftCellWidth = contentWidth / 2;
-                
-                doc.rect(margin - 2, tableY, contentWidth + 4, tableHeight);
-                doc.line(
-                  margin + leftCellWidth + 1.5,
-                  tableY,
-                  margin + leftCellWidth + 1.5,
-                  tableY + tableHeight
-                );
-                
-                // Add left photo
-                doc.addImage(
-                  leftPhoto.data,
-                  "JPEG",
-                  margin + (leftCellWidth - leftDimensions.width) / 2,
-                  yPos,
-                  leftDimensions.width,
-                  leftDimensions.height
-                );
-                
-                // Add right photo
-                doc.addImage(
-                  rightPhoto.data,
-                  "JPEG",
-                  margin + leftCellWidth + 5 + (leftCellWidth - rightDimensions.width) / 2,
-                  yPos,
-                  rightDimensions.width,
-                  rightDimensions.height
-                );
-                
-                yPos += maxImageHeight + 15;
               } else {
-                // Single horizontal photo
-                const photoDimensions = this.calculateImageDimensions(
-                  leftPhoto.width || 200,
-                  leftPhoto.height || 150,
-                  contentWidth * 0.8, // 80% width for single horizontal
-                  (200 * 25.4) / 96
-                );
-                
-                // Check if we need a new page
-                if (yPos + photoDimensions.height > 280) {
-                  doc.addPage();
-                  yPos = 20;
+                // Horizontal photos - try to fit two side by side
+                const nextPhoto = stage.photos[i + 1];
+                let nextIsHorizontal = false;
+                if (nextPhoto) {
+                  const nextAspectRatio = (nextPhoto.width || 200) / (nextPhoto.height || 150);
+                  nextIsHorizontal = nextAspectRatio >= 0.8; // 0.8 or higher ratio means horizontal
+                  console.log(`📸 Next photo: ${nextPhoto.width || 200}x${nextPhoto.height || 150}, ratio: ${nextAspectRatio.toFixed(2)}, isHorizontal: ${nextIsHorizontal}`);
                 }
                 
-                // Add border for single photo
-                doc.setDrawColor(200, 200, 200);
-                doc.setLineWidth(0.5);
-                const tableY = yPos - 5;
-                const tableHeight = photoDimensions.height + 10;
-                doc.rect(margin - 2, tableY, contentWidth + 4, tableHeight);
-                
-                // Center the horizontal photo
-                doc.addImage(
-                  leftPhoto.data,
-                  "JPEG",
-                  margin + (contentWidth - photoDimensions.width) / 2,
-                  yPos,
-                  photoDimensions.width,
-                  photoDimensions.height
-                );
-                
-                yPos += photoDimensions.height + 15;
-                i--; // Process next photo in next iteration
+                if (nextPhoto && nextIsHorizontal) {
+                  // Two horizontal photos side by side
+                  const leftDimensions = this.calculateImageDimensions(
+                    photo.width || 200,
+                    photo.height || 150,
+                    contentWidth / 2 - 5,
+                    (200 * 25.4) / 96
+                  );
+                  
+                  const rightDimensions = this.calculateImageDimensions(
+                    nextPhoto.width || 200,
+                    nextPhoto.height || 150,
+                    contentWidth / 2 - 5,
+                    (200 * 25.4) / 96
+                  );
+                  
+                  const maxImageHeight = Math.max(leftDimensions.height, rightDimensions.height);
+                  
+                  // Check if we need a new page
+                  if (yPos + maxImageHeight > 280) {
+                    doc.addPage();
+                    yPos = 20;
+                  }
+                  
+                  // Add border for two photos
+                  doc.setDrawColor(200, 200, 200);
+                  doc.setLineWidth(0.5);
+                  const tableY = yPos - 5;
+                  const tableHeight = maxImageHeight + 10;
+                  const leftCellWidth = contentWidth / 2;
+                  
+                  doc.rect(margin - 2, tableY, contentWidth + 4, tableHeight);
+                  doc.line(
+                    margin + leftCellWidth + 1.5,
+                    tableY,
+                    margin + leftCellWidth + 1.5,
+                    tableY + tableHeight
+                  );
+                  
+                  // Add left photo
+                  doc.addImage(
+                    photo.data,
+                    "JPEG",
+                    margin + (leftCellWidth - leftDimensions.width) / 2,
+                    yPos,
+                    leftDimensions.width,
+                    leftDimensions.height
+                  );
+                  
+                  // Add right photo
+                  doc.addImage(
+                    nextPhoto.data,
+                    "JPEG",
+                    margin + leftCellWidth + 5 + (leftCellWidth - rightDimensions.width) / 2,
+                    yPos,
+                    rightDimensions.width,
+                    rightDimensions.height
+                  );
+                  
+                  yPos += maxImageHeight + 15;
+                  i++; // Skip next photo since we processed it
+                } else {
+                  // Single horizontal photo - FORCE horizontal orientation
+                  const photoDimensions = this.calculateImageDimensions(
+                    photo.width || 200,
+                    photo.height || 150,
+                    contentWidth * 0.8, // 80% width for single horizontal
+                    (200 * 25.4) / 96,
+                    'horizontal' // FORCE horizontal orientation
+                  );
+                  
+                  // Check if we need a new page
+                  if (yPos + photoDimensions.height > 280) {
+                    doc.addPage();
+                    yPos = 20;
+                  }
+                  
+                  // Add border for single photo
+                  doc.setDrawColor(200, 200, 200);
+                  doc.setLineWidth(0.5);
+                  const tableY = yPos - 5;
+                  const tableHeight = photoDimensions.height + 10;
+                  doc.rect(margin - 2, tableY, contentWidth + 4, tableHeight);
+                  
+                  // Center the horizontal photo
+                  doc.addImage(
+                    photo.data,
+                    "JPEG",
+                    margin + (contentWidth - photoDimensions.width) / 2,
+                    yPos,
+                    photoDimensions.width,
+                    photoDimensions.height
+                  );
+                  
+                  yPos += photoDimensions.height + 15;
+                }
               }
+
+
             } catch (e) {
               console.warn("Could not add photo to PDF:", e);
             }
@@ -1468,26 +1442,29 @@ class DocumentGenerator {
         );
       }
 
-      // Smart photo layout with proper grouping
+      // Smart photo layout with orientation detection
       if (stage.photos && stage.photos.length > 0) {
-        for (let i = 0; i < stage.photos.length; i += 2) {
+        for (let i = 0; i < stage.photos.length; i++) {
           try {
-            const leftPhoto = stage.photos[i];
-            const rightPhoto = stage.photos[i + 1];
+            const photo = stage.photos[i];
+            // More robust orientation detection for Word
+            const originalWidth = photo.width || 200;
+            const originalHeight = photo.height || 150;
+            const aspectRatio = originalWidth / originalHeight;
             
-            // Check orientations
-            const leftIsVertical = leftPhoto ? (leftPhoto.height || 150) > (leftPhoto.width || 200) : false;
-            const rightIsVertical = rightPhoto ? (rightPhoto.height || 150) > (rightPhoto.width || 200) : false;
+            // Consider vertical if height is significantly larger than width
+            const isVertical = aspectRatio < 0.8; // Less than 0.8 ratio means clearly vertical
             
-            console.log(`📝 Word photos ${i + 1}${rightPhoto ? ` and ${i + 2}` : ''}: left=${leftIsVertical ? 'V' : 'H'}${rightPhoto ? `, right=${rightIsVertical ? 'V' : 'H'}` : ''}`);
+            console.log(`📝 Word Photo ${i + 1}: ${originalWidth}x${originalHeight}, ratio: ${aspectRatio.toFixed(2)}, isVertical: ${isVertical}`);
             
-            if (leftIsVertical && !rightPhoto) {
-              // Single vertical photo
+            if (isVertical) {
+              // Single vertical photo - FORCE vertical orientation
               const photoDimensions = this.calculateImageDimensions(
-                leftPhoto.width || 200,
-                leftPhoto.height || 150,
-                300, // Max width for single vertical
-                400  // Taller max height for vertical
+                photo.width || 200,
+                photo.height || 150,
+                400, // Max width for vertical
+                350, // Taller max height for vertical
+                'vertical' // FORCE vertical orientation
               );
               
               children.push(
@@ -1500,7 +1477,7 @@ class DocumentGenerator {
                             new Paragraph({
                               children: [
                                 new ImageRun({
-                                  data: this.base64ToBuffer(leftPhoto.data),
+                                  data: this.base64ToBuffer(photo.data),
                                   transformation: photoDimensions,
                                 }),
                               ],
@@ -1508,73 +1485,6 @@ class DocumentGenerator {
                             }),
                           ],
                           width: { size: 100, type: WidthType.PERCENTAGE },
-                          borders: {
-                            top: { style: BorderStyle.SINGLE, size: 1, color: "D3D3D3" },
-                            bottom: { style: BorderStyle.SINGLE, size: 1, color: "D3D3D3" },
-                            left: { style: BorderStyle.SINGLE, size: 1, color: "D3D3D3" },
-                            right: { style: BorderStyle.SINGLE, size: 1, color: "D3D3D3" },
-                          },
-                        }),
-                      ],
-                    }),
-                  ],
-                  width: { size: 100, type: WidthType.PERCENTAGE },
-                })
-              );
-            } else if (rightPhoto) {
-              // Two photos side by side
-              const leftDimensions = this.calculateImageDimensions(
-                leftPhoto.width || 200,
-                leftPhoto.height || 150,
-                300, // Max width for side-by-side
-                leftIsVertical ? 350 : 200  // Taller if vertical
-              );
-              
-              const rightDimensions = this.calculateImageDimensions(
-                rightPhoto.width || 200,
-                rightPhoto.height || 150,
-                300, // Max width for side-by-side
-                rightIsVertical ? 350 : 200  // Taller if vertical
-              );
-              
-              children.push(
-                new Table({
-                  rows: [
-                    new TableRow({
-                      children: [
-                        new TableCell({
-                          children: [
-                            new Paragraph({
-                              children: [
-                                new ImageRun({
-                                  data: this.base64ToBuffer(leftPhoto.data),
-                                  transformation: leftDimensions,
-                                }),
-                              ],
-                              alignment: AlignmentType.CENTER,
-                            }),
-                          ],
-                          width: { size: 50, type: WidthType.PERCENTAGE },
-                          borders: {
-                            top: { style: BorderStyle.SINGLE, size: 1, color: "D3D3D3" },
-                            bottom: { style: BorderStyle.SINGLE, size: 1, color: "D3D3D3" },
-                            left: { style: BorderStyle.SINGLE, size: 1, color: "D3D3D3" },
-                            right: { style: BorderStyle.SINGLE, size: 1, color: "D3D3D3" },
-                          },
-                        }),
-                        new TableCell({
-                          children: [
-                            new Paragraph({
-                              children: [
-                                new ImageRun({
-                                  data: this.base64ToBuffer(rightPhoto.data),
-                                  transformation: rightDimensions,
-                                }),
-                              ],
-                              alignment: AlignmentType.CENTER,
-                            }),
-                          ],
-                          width: { size: 50, type: WidthType.PERCENTAGE },
                           borders: {
                             top: { style: BorderStyle.SINGLE, size: 1, color: "D3D3D3" },
                             bottom: { style: BorderStyle.SINGLE, size: 1, color: "D3D3D3" },
@@ -1589,45 +1499,125 @@ class DocumentGenerator {
                 })
               );
             } else {
-              // Single horizontal photo
-              const photoDimensions = this.calculateImageDimensions(
-                leftPhoto.width || 200,
-                leftPhoto.height || 150,
-                500, // Wider max width for single horizontal
-                200  // Max height for horizontal
-              );
+              // Horizontal photos - try to fit two side by side
+              const nextPhoto = stage.photos[i + 1];
+              let nextIsHorizontal = false;
+              if (nextPhoto) {
+                const nextAspectRatio = (nextPhoto.width || 200) / (nextPhoto.height || 150);
+                nextIsHorizontal = nextAspectRatio >= 0.8; // 0.8 or higher ratio means horizontal
+                console.log(`📝 Word Next photo: ${nextPhoto.width || 200}x${nextPhoto.height || 150}, ratio: ${nextAspectRatio.toFixed(2)}, isHorizontal: ${nextIsHorizontal}`);
+              }
               
-              children.push(
-                new Table({
-                  rows: [
-                    new TableRow({
-                      children: [
-                        new TableCell({
-                          children: [
-                            new Paragraph({
-                              children: [
-                                new ImageRun({
-                                  data: this.base64ToBuffer(leftPhoto.data),
-                                  transformation: photoDimensions,
-                                }),
-                              ],
-                              alignment: AlignmentType.CENTER,
-                            }),
-                          ],
-                          width: { size: 100, type: WidthType.PERCENTAGE },
-                          borders: {
-                            top: { style: BorderStyle.SINGLE, size: 1, color: "D3D3D3" },
-                            bottom: { style: BorderStyle.SINGLE, size: 1, color: "D3D3D3" },
-                            left: { style: BorderStyle.SINGLE, size: 1, color: "D3D3D3" },
-                            right: { style: BorderStyle.SINGLE, size: 1, color: "D3D3D3" },
-                          },
-                        }),
-                      ],
-                    }),
-                  ],
-                  width: { size: 100, type: WidthType.PERCENTAGE },
-                })
-              );
+              if (nextPhoto && nextIsHorizontal) {
+                // Two horizontal photos side by side
+                const leftDimensions = this.calculateImageDimensions(
+                  photo.width || 200,
+                  photo.height || 150,
+                  300, // Max width for side-by-side
+                  200  // Max height for horizontal
+                );
+                
+                const rightDimensions = this.calculateImageDimensions(
+                  nextPhoto.width || 200,
+                  nextPhoto.height || 150,
+                  300, // Max width for side-by-side
+                  200  // Max height for horizontal
+                );
+                
+                children.push(
+                  new Table({
+                    rows: [
+                      new TableRow({
+                        children: [
+                          new TableCell({
+                            children: [
+                              new Paragraph({
+                                children: [
+                                  new ImageRun({
+                                    data: this.base64ToBuffer(photo.data),
+                                    transformation: leftDimensions,
+                                  }),
+                                ],
+                                alignment: AlignmentType.CENTER,
+                              }),
+                            ],
+                            width: { size: 50, type: WidthType.PERCENTAGE },
+                            borders: {
+                              top: { style: BorderStyle.SINGLE, size: 1, color: "D3D3D3" },
+                              bottom: { style: BorderStyle.SINGLE, size: 1, color: "D3D3D3" },
+                              left: { style: BorderStyle.SINGLE, size: 1, color: "D3D3D3" },
+                              right: { style: BorderStyle.SINGLE, size: 1, color: "D3D3D3" },
+                            },
+                          }),
+                          new TableCell({
+                            children: [
+                              new Paragraph({
+                                children: [
+                                  new ImageRun({
+                                    data: this.base64ToBuffer(nextPhoto.data),
+                                    transformation: rightDimensions,
+                                  }),
+                                ],
+                                alignment: AlignmentType.CENTER,
+                              }),
+                            ],
+                            width: { size: 50, type: WidthType.PERCENTAGE },
+                            borders: {
+                              top: { style: BorderStyle.SINGLE, size: 1, color: "D3D3D3" },
+                              bottom: { style: BorderStyle.SINGLE, size: 1, color: "D3D3D3" },
+                              left: { style: BorderStyle.SINGLE, size: 1, color: "D3D3D3" },
+                              right: { style: BorderStyle.SINGLE, size: 1, color: "D3D3D3" },
+                            },
+                          }),
+                        ],
+                      }),
+                    ],
+                    width: { size: 100, type: WidthType.PERCENTAGE },
+                  })
+                );
+                i++; // Skip next photo since we processed it
+              } else {
+                // Single horizontal photo - FORCE horizontal orientation
+                const photoDimensions = this.calculateImageDimensions(
+                  photo.width || 200,
+                  photo.height || 150,
+                  500, // Wider max width for single horizontal
+                  200, // Max height for horizontal
+                  'horizontal' // FORCE horizontal orientation
+                );
+                
+                children.push(
+                  new Table({
+                    rows: [
+                      new TableRow({
+                        children: [
+                          new TableCell({
+                            children: [
+                              new Paragraph({
+                                children: [
+                                  new ImageRun({
+                                    data: this.base64ToBuffer(photo.data),
+                                    transformation: photoDimensions,
+                                  }),
+                                ],
+                                alignment: AlignmentType.CENTER,
+                              }),
+                            ],
+                            width: { size: 100, type: WidthType.PERCENTAGE },
+                            borders: {
+                              top: { style: BorderStyle.SINGLE, size: 1, color: "D3D3D3" },
+                              bottom: { style: BorderStyle.SINGLE, size: 1, color: "D3D3D3" },
+                              left: { style: BorderStyle.SINGLE, size: 1, color: "D3D3D3" },
+                              right: { style: BorderStyle.SINGLE, size: 1, color: "D3D3D3" },
+                            },
+                          }),
+                        ],
+                      }),
+                    ],
+                    width: { size: 100, type: WidthType.PERCENTAGE },
+                  })
+                );
+              }
             }
           } catch (e) {
             console.error("Error processing photo:", e);
