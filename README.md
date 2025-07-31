@@ -1,4 +1,4 @@
-# 📋 Sistema de Generación de Informes Técnicos - Willis
+# 📋 Sistema de Generación de Informes Técnicos - DMS
 
 Sistema web para la generación automatizada de informes técnicos en PDF y Word, con autenticación y control de acceso.
 
