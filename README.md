@@ -1,6 +1,6 @@
 # 📋 Sistema de Generación de Informes Técnicos - Willis
 
-Sistema web para la generación automatizada de informes técnicos con autenticación y control de acceso.
+Sistema web para la generación automatizada de informes técnicos en PDF y Word, con autenticación y control de acceso.
 
 ## 🔐 Credenciales de Acceso
 
